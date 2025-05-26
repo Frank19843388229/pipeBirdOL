@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird</title>
+    <style>
+        *{ 
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body{
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .hidden{
+            display: none;
+            color: white;
+            font-size: 24px;
+        }
+        .container{
+            width: 500px;
+            height:500px;
+            background-color: red;
+            position: relative;
+            overflow: hidden;
+        }
+        .start{
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            font-size: 20px;
+            cursor: pointer;
+            background: #2ecc71;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            z-index: 2;
+        }
+        #score {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 1;
+        }
+        @media screen and (max-width:500px), (max-height:500px){
+            .hidden{
+                display: block;
+            }
+            .container{
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hidden">您的设备的分辨率无法启动本游戏</div>
+    <div class="container">
+        <div id="score">0</div>
+        <button class="start" onclick="start()">开始游戏</button>
+        
+    </div>
+
+<script>
+    const container = document.querySelector(".container");
+    let gameActive = false;
+    let score = 0;
+    const pipes = [];
+    
+    const bird = {
+        node: document.createElement('div'),
+        size: 20,
+        x: 100,
+        y: 250,
+        gravity: 0.5,
+        velocity: 0,
+        jumpForce: -8,
+        
+        init() {
+            this.node.style.cssText = `
+                position: absolute;
+                width: ${this.size}px;
+                height: ${this.size}px;
+                background: #f1c40f;
+                border-radius: 50%;
+                left: ${this.x}px;
+                top: ${this.y}px;
+                transition: transform 0.2s;
+            `;
+            container.appendChild(this.node);
+        },
+        
+        update() {
+            if (!gameActive) return;
+            
+            this.velocity += this.gravity;
+            this.y += this.velocity;
+            
+            // 边界限制
+            this.y = Math.max(0, Math.min(this.y, container.clientHeight - this.size));
+            
+            this.node.style.top = this.y + 'px';
+            this.node.style.transform = `rotate(${this.velocity * 5}deg)`;
+        },
+        
+        jump() {
+            if (gameActive) this.velocity = this.jumpForce;
+        }
+    };
+
+    class Pipe {
+        constructor() {
+            this.width = 60;
+            this.gap = 120;
+            this.x = container.clientWidth;
+            this.speed = 3;
+            this.scored = false;
+            this.topHeight = Math.random() * (300 - this.gap) + 50;
+
+            this.top = document.createElement('div');
+            this.bottom = document.createElement('div');
+
+        
+            [this.top, this.bottom].forEach(pipe => {
+                pipe.style.position = 'absolute';
+                pipe.style.width = this.width + 'px';
+                pipe.style.background = '#27ae60';
+                pipe.style.left = this.x + 'px';
+            });
+
+            this.top.style.height = this.topHeight + 'px';
+            this.top.style.top = '0';
+            this.top.style.borderRadius = '5px 5px 0 0';
+            
+            this.bottom.style.height = container.clientHeight - this.topHeight - this.gap + 'px';
+            this.bottom.style.bottom = '0';
+            this.bottom.style.borderRadius = '0 0 5px 5px';
+
+            container.append(this.top, this.bottom);
+        }
+
+        update() {
+            if (!gameActive) return;
+            
+            this.x -= this.speed;
+            this.top.style.left = this.x + 'px';
+            this.bottom.style.left = this.x + 'px';
+            if (!this.scored && this.x + this.width < bird.x) {
+                score++;
+                document.getElementById('score').textContent = score;
+                this.scored = true;
+            }
+            if (this.checkCollision()) gameOver();
+            if (this.x < -this.width) {
+                this.top.remove();
+                this.bottom.remove();
+                pipes.shift();
+            }
+            console.log(pipes.length);
+            
+        }
+
+        checkCollision() {
+            const birdRect = {
+                x: bird.x,
+                y: bird.y,
+                w: bird.size,
+                h: bird.size
+            };
+
+            const topPipeRect = {
+                x: this.x,
+                y: 0,
+                w: this.width,
+                h: this.topHeight
+            };
+
+            const bottomPipeRect = {
+                x: this.x,
+                y: container.clientHeight - (container.clientHeight - this.topHeight - this.gap),
+                w: this.width,
+                h: container.clientHeight - this.topHeight - this.gap
+            };
+
+            return this.isColliding(birdRect, topPipeRect) || 
+                   this.isColliding(birdRect, bottomPipeRect);
+        }
+
+        isColliding(rectA, rectB) {
+            return rectA.x < rectB.x + rectB.w &&
+                   rectA.x + rectA.w > rectB.x &&
+                   rectA.y < rectB.y + rectB.h &&
+                   rectA.y + rectA.h > rectB.y;
+        }
+    }
+
+    function start() {
+        gameActive = true;
+        score = 0;
+        pipes.forEach(pipe => {
+            pipe.top.remove();
+            pipe.bottom.remove();
+        });
+        pipes.length = 0;
+        document.getElementById('score').textContent = '0';
+        document.querySelector('.start').style.display = 'none';
+        bird.y = 250;
+        bird.velocity = 0;
+        bird.init();
+        const gameLoop = setInterval(() => {
+            if (!gameActive) {
+                clearInterval(gameLoop);
+                return;
+            }
+            
+            bird.update();
+            pipes.forEach(pipe => pipe.update());
+            
+            if (bird.y >= container.clientHeight - bird.size) gameOver();
+        }, 1000/60);
+        const pipeInterval = setInterval(() => {
+            if (gameActive) pipes.push(new Pipe());
+            else clearInterval(pipeInterval);
+        }, 1500);
+    }
+    function gameOver() {
+        gameActive = false;
+        document.querySelector('.start').style.display = 'block';
+        bird.node.remove();
+        pipes.forEach(pipe => {
+            pipe.top.remove();
+            pipe.bottom.remove();
+        });
+        document.querySelector('.start').disabled=true;
+        document.querySelector('.start').innerHTML='game over';
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space'){
+            if (gameActive) bird.jump();
+            else location.reload;
+        }
+    });
+    document.addEventListener('click', () => bird.jump());
+
+</script>
+</body>
+</html>
